@@ -1,0 +1,30 @@
+name:                free-taiko
+version:             0.0.0.0
+synopsis:            Free software implementation of osu! taiko mode
+description:         Free software implementation of osu! taiko mode
+homepage:            https://github.com/Fuuzetsu/free-taiko
+license:             GPL-3
+license-file:        LICENSE
+author:              Mateusz Kowalczyk
+maintainer:          fuuzetsu@fuuzetsu.co.uk
+copyright:           © Mateusz Kowalczyk, 2014
+category:            Game
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable free-taiko
+  main-is:             Main.hs
+  build-depends:
+      base >=4 && <5
+    , containers
+    , directory
+    , filepath
+    , free-game
+    , lens
+    , mtl
+    , osz-loader
+    , time
+    , transformers
+    , vector
+  hs-source-dirs:      src
+  default-language:    Haskell2010
