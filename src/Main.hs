@@ -45,8 +45,10 @@ loadImages ∷ MonadIO m ⇒ m Images
 loadImages = do
   sb ← readBitmap $ imgdir </> "small_blue.png"
   sr ← readBitmap $ imgdir </> "small_red.png"
+  gl ← readBitmap $ imgdir </> "goal.png"
   return $ Images { _smallBlue = sb
                   , _smallRed = sr
+                  , _goal = gl
                   }
 
 loadRes ∷ MonadIO m ⇒ m Resources
@@ -106,8 +108,9 @@ main = void . run $ do
     menuLoop ∷ MenuLoop SongState
     menuLoop = do
       bmaps ← use (screenState . maps)
+      uset ← use userSettings
 
-      whenM (keyPress KeyEscape) $ quit .= True
+      whenM (keyPress $ uset ^. quitKey) $ quit .= True
       whenM (keyPress KeyUp) $ screenState . maps %= C.previous
       whenM (keyPress KeyDown) $ screenState . maps %= C.next
       whenM (keyPress KeyEnter) $ case PL._focus bmaps of

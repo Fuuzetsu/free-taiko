@@ -75,8 +75,41 @@ instance Default WindowState where
 
 makeLenses ''WindowState
 
+data Hit = Perfect | Good | Bad | Wrong | Miss | NOP deriving (Show, Eq)
+
+data UserSettings = U { _outsideLeft ∷ Key
+                      , _outsideRight ∷ Key
+                      , _insideLeft ∷ Key
+                      , _insideRight ∷ Key
+                      , _quitKey ∷ Key
+                      } deriving (Show, Eq)
+
+instance Default UserSettings where
+  def = U { _outsideLeft = KeyD
+          , _insideLeft = KeyF
+          , _insideRight = KeyJ
+          , _outsideRight = KeyK
+          , _quitKey = KeyEscape
+          }
+
+makeLenses ''UserSettings
+
+data Score = Score { _scorePerfect ∷ Int
+                   , _scoreGood ∷ Int
+                   , _scoreBad ∷ Int
+                   , _scoreWrong ∷ Int
+                   , _scoreMiss ∷ Int
+                   , _scoreCalmDown ∷ Int
+                   } deriving (Show, Eq)
+
+instance Default Score where
+  def = Score 0 0 0 0 0 0
+
+makeLenses ''Score
+
 data Images = Images { _smallRed ∷ Bitmap
                      , _smallBlue ∷ Bitmap
+                     , _goal ∷ Bitmap
                      }
 
 makeLenses ''Images
@@ -91,6 +124,7 @@ data ScreenState a = S { _windowState ∷ WindowState
                        , _quit ∷ Bool
                        , _targetFrameRate ∷ Int
                        , _resources ∷ Resources
+                       , _userSettings ∷ UserSettings
                        , _screenState ∷ a
                        }
 
@@ -101,6 +135,7 @@ mkMenu m r = S { _windowState = def
                , _quit = False
                , _targetFrameRate = 60
                , _resources = r
+               , _userSettings = def
                , _screenState = m
                }
 
@@ -120,6 +155,9 @@ data SongState = SS
   { _dons ∷ [Annotated Don]
   , _elapsed ∷ !Int
   , _lastTick ∷ !UnixTime
+  , _waitingFor ∷ Maybe Don
+  , _blocking ∷ [Key] -- ^ List of keys we're waiting to go up
+  , _score ∷ Score
   } deriving (Show, Eq)
 
 makeLenses ''SongState
