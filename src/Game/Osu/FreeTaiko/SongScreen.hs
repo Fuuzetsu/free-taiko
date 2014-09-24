@@ -61,6 +61,16 @@ toSS (p, d) = do
     toDon ∷ UnixTime → Int → Annotated Don
     toDon t offs = Annot (addMs t offs) SmallRed
 
+-- | Give current time, a don and window width, produces the
+-- horizontal position for the don to be rendered at.
+renderPos ∷ UnixTime → Annotated Don → Double → Double
+renderPos t (Annot t' _) w =
+  let UnixDiffTime (CTime s) ms = t' `diffUnixTime` t
+      msc ∷ Double
+      msc = fromIntegral (s * 1000) + (fromIntegral ms / 1000)
+
+  in msc / (w / 1000)
+
 songLoop ∷ SongLoop ()
 songLoop = do
   ct ← liftIO getUnixTime
@@ -72,7 +82,11 @@ songLoop = do
       next = getDons ct 1000 pruned
   screenState . dons .= pruned
   fps ← getFPS
+  Box _ (V2 x y) ← getBoundingBox
   color (Color 255 0 0 255) $ translate (V2 10 10) $ text fnt 10 (show fps)
-  color green . translate (V2 200 200) . text fnt 20 . show $ length next
-  color yellow . translate (V2 0 250) . text fnt 10 $ show next
+  color green . translate (V2 (x - 25) 20) . text fnt 20 . show $ length next
+  color yellow . translate (V2 0 (y - 15)) . text fnt 10 $ show next
+  let rd d = color red . translate (V2 (renderPos ct d x) (y / 2)) $ text fnt 25 "X"
+  mapM_ rd next
+
   tick >> unless q songLoop
