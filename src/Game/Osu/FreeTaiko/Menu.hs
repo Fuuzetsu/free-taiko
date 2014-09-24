@@ -16,6 +16,7 @@
 
 module Game.Osu.FreeTaiko.Menu where
 
+import qualified Data.List.PointedList as PL
 import           Codec.Archive.Zip
 import           Control.Applicative
 import           Control.Lens
@@ -55,7 +56,12 @@ uncompressOsu xs =
 
 processMap ∷ OsuMap → Either String TaikoData
 processMap m = case _mode . _general $ m of
-  1 → Right $ TaikoData m
+  1 → Right $ TaikoData { _tdGeneral = _general m
+                        , _tdMetadata = _metadata m
+                        , _tdDifficulty = _difficulty m
+                        , _tdTimingPoints = _timingPoints m
+                        , _tdHitObjects = _hitObjects m
+                        }
   n → Left $ "Mode " ++ show n ++ " found when looking for taiko instead"
 
 readMaps ∷ P.FilePath → IO [(P.FilePath, Either T.Text TaikoData)]
@@ -81,9 +87,9 @@ readMaps d = do
     readOsz ∷ IO [(P.FilePath, BL.ByteString)]
     readOsz = getOszFiles d >>= mapM (\x → (x,) <$> BL.readFile x)
 
-runMenu ∷ P.FilePath → Game Menu
-runMenu d = do
-  ds ← liftIO (readMaps d)
-  return $ M { _currentDirectory = d
-             , _maps = ds
-             }
+runMenu ∷ P.FilePath → Game (Maybe Menu)
+runMenu d = liftIO (readMaps d) >>= return . \case
+  []   → Nothing
+  x:xs → Just $ M { _currentDirectory = d
+                  , _maps = PL.PointedList [] x xs
+                  }

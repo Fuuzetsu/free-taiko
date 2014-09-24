@@ -20,6 +20,7 @@ module Game.Osu.FreeTaiko.Types where
 import           Control.Lens
 import           Control.Monad.State.Strict
 import           Data.Default
+import qualified Data.List.PointedList as PL
 import qualified Data.Text as T
 import           Data.Typeable
 import           FreeGame
@@ -41,14 +42,20 @@ mkR x y | x <= 0 || y <= 0 = def
 
 makeLenses ''Resolution
 
-newtype TaikoData = TaikoData OsuMap
+data TaikoData = TaikoData { _tdGeneral ∷ General
+                           , _tdMetadata ∷ Metadata
+                           , _tdDifficulty ∷ Difficulty
+                           , _tdTimingPoints ∷ [TimingPoint]
+                           , _tdHitObjects ∷ [HitObject]
+                           }
                   deriving (Show, Eq)
 
 makeLenses ''TaikoData
 
-data Menu = M { _currentDirectory ∷ FilePath
-              , _maps ∷ [(FilePath, Either T.Text TaikoData)]
-              } deriving (Show, Eq)
+data Menu = M
+  { _currentDirectory ∷ FilePath
+  , _maps ∷ PL.PointedList (FilePath, Either T.Text TaikoData)
+  } deriving (Show, Eq)
 
 makeLenses ''Menu
 

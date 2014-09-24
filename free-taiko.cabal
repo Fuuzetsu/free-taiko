@@ -29,6 +29,7 @@ executable free-taiko
     , lens
     , mtl
     , osz-loader
+    , pointedlist
     , system-filepath
     , text
     , time
