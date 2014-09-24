@@ -23,8 +23,10 @@ import           Data.Monoid
 import qualified Data.Text as T
 import           FreeGame
 import           Game.Osu.FreeTaiko.Menu
+import           Game.Osu.FreeTaiko.SongScreen
 import           Game.Osu.FreeTaiko.Types
 import           Game.Osu.OszLoader.Types
+import           System.Exit
 
 run ∷ Game a → IO (Maybe a)
 run = runGame (def ^. windowMode) (def ^. resolution . unR)
@@ -82,20 +84,28 @@ main = void . run $ do
   clearColor $ Color 0 0 0 0
   runMenu dir >>= \case
     Nothing → liftIO $ print "No songs"
-    Just m → loadRes >>= evalStateT menuLoop . mkMenu m
+    Just m → do
+      ss ← loadRes >>= return . mkMenu m
+      s ← evalStateT menuLoop ss
+      evalStateT songLoop (ss & screenState .~ s)
   where
-    menuLoop ∷ MenuLoop ()
+    menuLoop ∷ MenuLoop SongState
     menuLoop = do
+      bmaps ← use (screenState . maps)
+
       whenM (keyPress KeyEscape) $ quit .= True
       whenM (keyPress KeyUp) $ screenState . maps %= C.previous
       whenM (keyPress KeyDown) $ screenState . maps %= C.next
-      fnt ← use (resources . font)
-      bmaps ← use (screenState . maps)
-      renderResult 15 2 fnt bmaps
-      q ← use quit
-      fps ← getFPS
+      whenM (keyPress KeyEnter) $ case PL._focus bmaps of
+        (_, Left _) → return ()
+        (p, Right x) → screenState . picked .= Just (p, x)
 
-      color (Color 255 0 0 255) $ translate (V2 5 5) $ text fnt 5 (show fps)
-
-
-      tick >> unless q menuLoop
+      use (screenState . picked) >>= \case
+        Just s → toSS s >>= return
+        Nothing → do
+          fnt ← use (resources . font)
+          renderResult 15 2 fnt bmaps
+          fps ← getFPS
+          color (Color 255 0 0 255) $ translate (V2 5 5) $ text fnt 5 (show fps)
+          q ← use quit
+          tick >> if q then liftIO exitSuccess else menuLoop

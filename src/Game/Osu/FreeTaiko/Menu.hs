@@ -33,6 +33,7 @@ import           Game.Osu.OszLoader.Types
 import qualified Prelude as P
 import           Prelude hiding (FilePath)
 import           System.Directory
+import           Control.Monad.State.Strict
 
 
 type TaikoParseResult = Either T.Text TaikoData
@@ -87,9 +88,10 @@ readMaps d = do
     readOsz ∷ IO [(P.FilePath, BL.ByteString)]
     readOsz = getOszFiles d >>= mapM (\x → (x,) <$> BL.readFile x)
 
-runMenu ∷ P.FilePath → Game (Maybe Menu)
+runMenu ∷ MonadIO m ⇒ P.FilePath → m (Maybe Menu)
 runMenu d = liftIO (readMaps d) >>= return . \case
   []   → Nothing
   x:xs → Just $ M { _currentDirectory = d
                   , _maps = PL.PointedList [] x xs
+                  , _picked = Nothing
                   }

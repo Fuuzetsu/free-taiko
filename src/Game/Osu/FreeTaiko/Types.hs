@@ -23,6 +23,8 @@ import           Data.Default
 import qualified Data.List.PointedList as PL
 import qualified Data.Text as T
 import           Data.Typeable
+import           Data.UnixTime
+import           Foreign.C.Types
 import           FreeGame
 import           Game.Osu.OszLoader.Types
 
@@ -55,6 +57,7 @@ makeLenses ''TaikoData
 data Menu = M
   { _currentDirectory ∷ FilePath
   , _maps ∷ PL.PointedList (FilePath, Either T.Text TaikoData)
+  , _picked ∷ Maybe (FilePath, TaikoData)
   } deriving (Show, Eq)
 
 makeLenses ''Menu
@@ -94,3 +97,23 @@ mkMenu m r = S { _windowState = def
                }
 
 type MenuLoop = StateT (ScreenState Menu) Game
+
+data Don = SmallRed | SmallBlue | BigRed | BigBlue
+         deriving (Show, Eq, Enum)
+
+-- | Time-annotated elements
+data Annotated a = Annot { _annotTime ∷ !UnixTime
+                         , _unAnnot ∷  a
+                         } deriving (Show, Eq, Ord)
+
+makeLenses ''Annotated
+
+data SongState = SS
+  { _dons ∷ [Annotated Don]
+  , _elapsed ∷ !Int
+  , _lastTick ∷ !UnixTime
+  } deriving (Show, Eq)
+
+makeLenses ''SongState
+
+type SongLoop = StateT (ScreenState SongState) Game

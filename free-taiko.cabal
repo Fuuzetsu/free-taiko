@@ -34,6 +34,7 @@ executable free-taiko
     , text
     , time
     , transformers
+    , unix-time
     , vector
     , zip-archive
   hs-source-dirs:      src
