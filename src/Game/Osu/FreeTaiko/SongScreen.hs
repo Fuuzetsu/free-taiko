@@ -39,17 +39,9 @@ getDons t r = takeWhile inRange
     diftime = UnixDiffTime 0 (r * 1000)
     inRange (Annot t' _) = addMs t (fromIntegral r) >= t'
 
--- | Adds set number of miliseconds to the 'UnixTime' works around the
--- questionable default behaviour at
--- https://github.com/kazu-yamamoto/unix-time/issues/27
+-- | Adds set number of miliseconds to the 'UnixTime'.
 addMs ∷ UnixTime → Int → UnixTime
-addMs t i = addUnixDiffTime t (UnixDiffTime secs mcs)
-  where
-    secs :: CTime
-    secs = fromIntegral $ i `div` 1000
-
-    mcs :: Int32
-    mcs = fromIntegral $ (i `mod` 1000) * 1000
+addMs t i = addUnixDiffTime t $ microSecondsToUnixDiffTime (i * 1000)
 
 toSS ∷ MonadIO m ⇒ (FilePath, TaikoData) → m SongState
 toSS (p, d) = do
