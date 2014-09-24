@@ -27,6 +27,7 @@ import           Game.Osu.FreeTaiko.SongScreen
 import           Game.Osu.FreeTaiko.Types
 import           Game.Osu.OszLoader.Types
 import           System.Exit
+import           System.FilePath ((</>))
 
 run ∷ Game a → IO (Maybe a)
 run = runGame (def ^. windowMode) (def ^. resolution . unR)
@@ -37,10 +38,23 @@ dir = "/home/shana/oszs"
 fontdir ∷ FilePath
 fontdir = "/home/shana/programming/free-taiko/data/fonts/VL-PGothic-Regular.ttf"
 
+imgdir ∷ FilePath
+imgdir = "/home/shana/programming/free-taiko/data/images"
+
+loadImages ∷ MonadIO m ⇒ m Images
+loadImages = do
+  sb ← readBitmap $ imgdir </> "small_blue.png"
+  sr ← readBitmap $ imgdir </> "small_red.png"
+  return $ Images { _smallBlue = sb
+                  , _smallRed = sr
+                  }
+
 loadRes ∷ MonadIO m ⇒ m Resources
 loadRes = do
   fnt ← loadFont fontdir
-  return $ Res { _font = fnt }
+  img ← loadImages
+  return $ Res { _font = fnt
+               , _images = img }
 
 renderResult ∷ (Picture2D m, FromFinalizer m, MonadIO m) ⇒ Double -- ^ font size
              → Double -- ^ spacing between each line

@@ -65,6 +65,12 @@ renderPos t (Annot t' _) w =
                                           | msc <= 500 → yellow
                                           | otherwise  → red)
 
+getBmp ∷ Images → Annotated Don → Bitmap
+getBmp i (Annot _ d) = i ^. case d of
+  SmallBlue → smallBlue
+  SmallRed → smallRed
+  _ → smallBlue
+
 songLoop ∷ SongLoop ()
 songLoop = do
   ct ← liftIO getUnixTime
@@ -77,11 +83,12 @@ songLoop = do
       next = getDons ct (round x) pruned
   screenState . dons .= pruned
   fps ← getFPS
+  imgs ← use (resources . images)
   color (Color 255 0 0 255) $ translate (V2 10 10) $ text fnt 10 (show fps)
-  color green . translate (V2 (x - 25) 20) . text fnt 20 . show $ length next
-  color yellow . translate (V2 0 (y - 15)) . text fnt 10 $ show next
+  -- color green . translate (V2 (x - 25) 20) . text fnt 20 . show $ length next
+  -- color yellow . translate (V2 0 (y - 15)) . text fnt 10 $ show next
   let rd d = let (xp, c) = renderPos ct d x
-             in color c . translate (V2 xp (y / 2)) $ text fnt 25 "X"
+             in translate (V2 xp (y / 2)) $ bitmap (getBmp imgs d)
   mapM_ rd next
 
   tick >> unless q songLoop

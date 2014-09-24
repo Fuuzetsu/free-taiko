@@ -75,7 +75,15 @@ instance Default WindowState where
 
 makeLenses ''WindowState
 
-data Resources = Res { _font ∷ Font }
+data Images = Images { _smallRed ∷ Bitmap
+                     , _smallBlue ∷ Bitmap
+                     }
+
+makeLenses ''Images
+
+data Resources = Res { _font ∷ Font
+                     , _images ∷ Images
+                     }
 
 makeLenses ''Resources
 
