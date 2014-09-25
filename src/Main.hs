@@ -52,6 +52,7 @@ loadImages = do
   ol ← readBitmap $ imgdir </> "outer_left_pressed.png"
   ir ← readBitmap $ imgdir </> "inner_right_pressed.png"
   il ← readBitmap $ imgdir </> "inner_left_pressed.png"
+  bg ← readBitmap $ imgdir </> "bg_1080p.png"
   return $ Images { _smallBlue = sb
                   , _smallRed = sr
                   , _bigBlue = bb
@@ -61,6 +62,7 @@ loadImages = do
                   , _innerLeftPressed = il
                   , _outerRightPressed = oR
                   , _outerLeftPressed = ol
+                  , _bg1080p = bg
                   }
 
 loadRes ∷ MonadIO m ⇒ m Resources

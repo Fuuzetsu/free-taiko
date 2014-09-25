@@ -162,11 +162,14 @@ renderAtGoal ∷ Bitmap → SongLoop ()
 renderAtGoal b = do
   Box _ (V2 _ y) ← getBoundingBox
   widthOffset ← goalOffset
-  translate (V2 widthOffset (y / 2)) $ (bitmap b)
+  translate (V2 widthOffset (y * beltOffset)) $ (bitmap b)
 
 -- | Time for the don to spend in flying stage
 flyingTime ∷ Double
 flyingTime = 500
+
+beltOffset ∷ Double
+beltOffset = 0.41
 
 pruneFlying ∷ UnixTime → SongLoop ()
 pruneFlying ct = do
@@ -191,6 +194,11 @@ renderElements ∷ UnixTime → SongLoop ()
 renderElements ct = do
   bkd ← use (screenState . blocking)
   imgs ← use (resources . images)
+
+  -- Background
+  let (w, h) = bitmapSize (imgs ^. bg1080p) & both %~ ((/ 2) . fromIntegral)
+  translate (V2 w h) (bitmap (imgs ^. bg1080p))
+
   -- Score info &c
   renderInfo bkd
 

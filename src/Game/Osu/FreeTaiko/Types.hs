@@ -33,7 +33,7 @@ newtype Resolution = R { _unR ∷ BoundingBox2 }
 
 -- | 800x600 default resolution
 instance Default Resolution where
-  def = R $ Box (V2 0 0) (V2 1600 600)
+  def = R $ Box (V2 0 0) (V2 1920 1080)
 
 -- | Makes a 'Resolution', defaulting to 800x600 if either given Int
 -- is ≤ 0.
@@ -115,6 +115,7 @@ data Images = Images { _smallRed ∷ Bitmap
                      , _innerLeftPressed ∷ Bitmap
                      , _outerRightPressed ∷ Bitmap
                      , _outerLeftPressed ∷ Bitmap
+                     , _bg1080p ∷ Bitmap
                      }
 
 makeLenses ''Images
