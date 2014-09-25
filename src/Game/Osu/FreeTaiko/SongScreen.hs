@@ -185,10 +185,10 @@ renderFlying ct don@(Annot t _) = do
     else do
     Box _ (V2 _ y) ← getBoundingBox
     let px = 200 / flyingTime * diff
-        py = negate $ (y / 2) / flyingTime * diff
-        a  = realToFrac $ 1 - (diff / flyingTime)
-    color (Color 1 1 1 a) . translate (V2 px py) $ renderAtGoal bmp
-
+        py = negate $ (y * beltOffset) / flyingTime * diff
+        a  = 1 - (diff / flyingTime)
+    color (Color 1 1 1 (realToFrac a))
+      . translate (V2 px py) . scale (V2 a a) $ renderAtGoal bmp
 
 renderElements ∷ UnixTime → SongLoop ()
 renderElements ct = do
