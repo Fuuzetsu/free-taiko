@@ -48,7 +48,7 @@ addMs t i = addUnixDiffTime t $ microSecondsToUnixDiffTime (i * 1000)
 toSS ∷ MonadIO m ⇒ (FilePath, TaikoData) → m SongState
 toSS (_, d) = do
   ct ← liftIO getUnixTime
-  let ds = [ toDon ct i | Spinner (_, _, i, _, _, _) ← _tdHitObjects d ]
+  let ds = [ toDon ct i t | Spinner (_, _, i, _, t, _) ← _tdHitObjects d ]
   return $ SS { _dons = ds
               , _elapsed = 0
               , _lastTick = ct
@@ -59,8 +59,13 @@ toSS (_, d) = do
               }
 
   where
-    toDon ∷ UnixTime → Int → Annotated Don
-    toDon t offs = Annot (addMs t offs) SmallRed
+    toDon ∷ UnixTime → Int → Int → Annotated Don
+    toDon t offs t' = Annot (addMs t offs) $ case t' of
+      0  → SmallRed
+      4  → BigRed
+      8  → SmallBlue
+      12 → BigBlue
+      _  → SmallRed
 
 diffToMs ∷ UnixDiffTime → Double
 diffToMs (UnixDiffTime (CTime s) ms) =
@@ -103,7 +108,7 @@ processKeys = do
             screenState . waitingFor .= Just d
 
   onKey quitKey $ quit .= True
-  outsideLeft -!> (BigBlue, outerLeftPressed)
+  outsideLeft -!> (SmallBlue, outerLeftPressed)
   outsideRight -!> (BigBlue, outerRightPressed)
   insideLeft -!> (SmallRed, innerLeftPressed)
   insideRight -!> (SmallRed, innerRightPressed)
