@@ -3,6 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -38,7 +39,6 @@ pruneDons t = break ((t <) . _annotTime)
 getDons ∷ UnixTime → Int32 → [Annotated Don] → [Annotated Don]
 getDons t r = takeWhile inRange
   where
-    diftime = UnixDiffTime 0 (r * 1000)
     inRange (Annot t' _) = addMs t (fromIntegral r) >= t'
 
 -- | Adds set number of miliseconds to the 'UnixTime'.
@@ -46,7 +46,7 @@ addMs ∷ UnixTime → Int → UnixTime
 addMs t i = addUnixDiffTime t $ microSecondsToUnixDiffTime (i * 1000)
 
 toSS ∷ MonadIO m ⇒ (FilePath, TaikoData) → m SongState
-toSS (p, d) = do
+toSS (_, d) = do
   ct ← liftIO getUnixTime
   let ds = [ toDon ct i | Spinner (_, _, i, _, _, _) ← _tdHitObjects d ]
   return $ SS { _dons = ds
@@ -67,8 +67,8 @@ diffToMs (UnixDiffTime (CTime s) ms) =
 
 -- | Give current time, a don and window width, produces the
 -- horizontal position for the don to be rendered at.
-renderPos ∷ UnixTime → Annotated Don → Double → Double
-renderPos t (Annot t' _) w = diffToMs $ t' `diffUnixTime` t
+renderPos ∷ UnixTime → Annotated Don → Double
+renderPos t (Annot t' _) = diffToMs $ t' `diffUnixTime` t
 
 getBmp ∷ Images → Annotated Don → Bitmap
 getBmp i (Annot _ d) = i ^. case d of
@@ -85,16 +85,10 @@ check ct (Annot t d) d' =
       | msc <= 150 → Bad
       | otherwise → NOP
 
-songLoop ∷ SongLoop ()
-songLoop = do
-  ct ← liftIO getUnixTime
-  fnt ← use (resources . font)
-  ds ← use (screenState . dons)
-  q ← use quit
-  Box _ (V2 x y) ← getBoundingBox
+processKeys ∷ SongLoop ()
+processKeys = do
   us ← use userSettings
   imgs ← use (resources . images)
-
   let onKey k = whenM (keyPress (us ^. k))
       k -!> (d, b) = do
         let k' = us ^. k
@@ -112,48 +106,87 @@ songLoop = do
   insideLeft -!> (SmallRed, innerLeftPressed)
   insideRight -!> (SmallRed, innerRightPressed)
 
-  let (missed, pruned) = pruneDons ct ds
-      next = getDons ct (round x) pruned
-
-  screenState . score . scoreMiss += length missed
-
-  when (length pruned > 0) $ use (screenState . waitingFor) >>= \case
-    Nothing → screenState . dons .= pruned
-    Just d → case check ct (head pruned) d of
-      Perfect → ssuc scorePerfect pruned
-      Good → ssuc scoreGood pruned
-      Bad → ssuc scoreBad pruned
-      Wrong → ssuc scoreWrong pruned
-      Miss → ssuc scoreMiss pruned
-      NOP → ssucp scoreCalmDown pruned
-
-  fps ← getFPS
-
-  color (Color 255 0 0 255) $ translate (V2 10 10) $ text fnt 10 (show fps)
-  -- color green . translate (V2 (x - 25) 20) . text fnt 20 . show $ length next
+renderInfo ∷ [(Key, Bitmap)] → SongLoop ()
+renderInfo bkd = do
   scr ← use (screenState . score)
-  bkd ← use (screenState . blocking)
+  fnt ← use (resources . font)
+  fps ← getFPS
+  color red $ translate (V2 10 10) $ text fnt 10 (show fps)
   color yellow . translate (V2 30 30) . text fnt 10 $ show scr
   color yellow . translate (V2 30 45) . text fnt 10 $ show (map fst bkd)
-  let middle = (y / 2)
-      goalImg = imgs ^. goal
-      hg = (/ 2) . fromIntegral . fst . bitmapSize $ imgs ^. goal
-      rd d = translate (V2 (renderPos ct d x + hg) (y / 2))
-               $ bitmap (getBmp imgs d)
-      renderAtGoal b = translate (V2 hg middle) $ bitmap b
 
+prune ∷ UnixTime → SongLoop [Annotated Don]
+prune ct = do
+  ds ← use (screenState . dons)
+  let (m, r) = pruneDons ct ds
+  screenState . score . scoreMiss += length m
+  screenState . dons .= r
+  return r
+
+songLoop ∷ SongLoop ()
+songLoop = do
+  innerLoop
+
+-- | Adds one to the given score lens and clears the waiting state.
+addScore ∷ Num a ⇒ Lens' Score a → SongLoop ()
+addScore l = do
+  screenState . score . l += 1
+  screenState . waitingFor .= Nothing
+
+(↠) :: SongLoop a → ([Annotated Don] → [Annotated Don]) → SongLoop ()
+x ↠ f = x >> (screenState . dons %= f)
+
+-- | Produces the horizontal offset of the goal's render position.
+-- Effectively half the size of the goal bitmap for now.
+goalOffset ∷ SongLoop Double
+goalOffset = do
+ g ← use (resources . images . goal)
+ return . (/ 2) . fromIntegral . fst $ bitmapSize g
+
+-- | Renders the given bitmap at the same place as the goal itself.
+-- Useful for goal overlays and the goal itself.
+renderAtGoal ∷ Bitmap → SongLoop ()
+renderAtGoal b = do
+  Box _ (V2 _ y) ← getBoundingBox
+  widthOffset ← goalOffset
+  translate (V2 widthOffset (y / 2)) (bitmap b)
+
+renderElements ∷ UnixTime → SongLoop ()
+renderElements ct = do
+  bkd ← use (screenState . blocking)
+  imgs ← use (resources . images)
+  -- Score info &c
+  renderInfo bkd
+
+  -- Goal shape
   renderAtGoal (imgs ^. goal)
-  mapM_ (renderAtGoal . snd) bkd
-  mapM_ rd next
 
-  tick >> unless q songLoop
-  where
-    scoreUp l = do
-      screenState . score . l += 1
-      screenState . waitingFor .= Nothing
-    ssuc l p = do
-      scoreUp l
-      screenState . dons .= drop 1 p
-    ssucp l p = do
-      scoreUp l
-      screenState . dons .= p
+  -- Goal overlays
+  mapM_ (renderAtGoal . snd) bkd
+
+  -- Upcoming dons
+  ds ← use (screenState . dons)
+  Box _ (V2 _ y) ← getBoundingBox
+
+  -- Render at goal + offset by time
+  let rend d = translate (V2 (renderPos ct d) 0) $ renderAtGoal (getBmp imgs d)
+  mapM_ rend $ getDons ct 5000 ds
+
+innerLoop ∷ SongLoop ()
+innerLoop = do
+  processKeys
+  ct ← liftIO getUnixTime
+  remaining ← prune ct
+
+  when (length remaining > 0) $ use (screenState . waitingFor) >>= \case
+    Nothing → return ()
+    Just d → case check ct (head remaining) d of
+      Perfect → addScore scorePerfect ↠ drop 1
+      Good    → addScore scoreGood    ↠ drop 1
+      Bad     → addScore scoreBad     ↠ drop 1
+      Wrong   → addScore scoreWrong   ↠ drop 1
+      NOP     → addScore scoreCalmDown
+      _       → return ()
+
+  renderElements ct
+  tick >> unlessM (use quit) innerLoop
