@@ -56,6 +56,7 @@ toSS (_, d) = do
               , _score = def
               , _blocking = []
               , _flyingOff = []
+              , _songCombo = def
               }
 
   where
@@ -118,9 +119,11 @@ renderInfo bkd = do
   scr ← use (screenState . score)
   fnt ← use (resources . font)
   fps ← getFPS
+  cmb ← use (screenState . songCombo)
   color red $ translate (V2 10 10) $ text fnt 10 (show fps)
   color yellow . translate (V2 30 30) . text fnt 10 $ show scr
   color yellow . translate (V2 30 45) . text fnt 10 $ show (map fst bkd)
+  color green  . translate (V2 30 60) . text fnt 10 $ show cmb
 
 prune ∷ UnixTime → SongLoop [Annotated Don]
 prune ct = do
@@ -190,6 +193,15 @@ renderFlying ct don@(Annot t _) = do
     color (Color 1 1 1 (realToFrac a))
       . translate (V2 px py) . scale (V2 a a) $ renderAtGoal bmp
 
+sucCombo ∷ SongLoop ()
+sucCombo = do
+  Combo c m ← use (screenState . songCombo)
+  let nc = succ c
+  screenState . songCombo .= Combo nc (max nc m)
+
+resetCombo ∷ SongLoop ()
+resetCombo = screenState . songCombo . currentCombo .= 0
+
 renderElements ∷ UnixTime → SongLoop ()
 renderElements ct = do
   bkd ← use (screenState . blocking)
@@ -231,12 +243,14 @@ innerLoop = do
   when (length remaining > 0) $ use (screenState . waitingFor) >>= \case
     Nothing → return ()
     Just d → case check ct (head remaining) d of
-      Perfect → addScore scorePerfect  >> fly ct
-      Good    → addScore scoreGood     >> fly ct
-      Bad     → addScore scoreBad      >> fly ct
-      Wrong   → addScore scoreWrong
+      Perfect → addScore scorePerfect  >> fly ct >> sucCombo
+      Good    → addScore scoreGood     >> fly ct >> sucCombo
+      Bad     → addScore scoreBad      >> fly ct >> resetCombo
+      Wrong   → addScore scoreWrong              >> resetCombo
       NOP     → addScore scoreCalmDown
       _       → return ()
 
   renderElements ct
-  tick >> unlessM (use quit) innerLoop
+
+  q ← use quit
+  tick >> unless (q || null remaining) innerLoop

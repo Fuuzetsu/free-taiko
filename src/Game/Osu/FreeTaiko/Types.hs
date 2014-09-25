@@ -158,6 +158,15 @@ data Annotated a = Annot { _annotTime ∷ !UnixTime
 
 makeLenses ''Annotated
 
+data Combo = Combo { _currentCombo ∷ Int
+                   , _maxCombo ∷ Int
+                   } deriving (Show, Eq)
+
+instance Default Combo where
+  def = Combo { _currentCombo = 0, _maxCombo = 0 }
+
+makeLenses ''Combo
+
 data SongState = SS
   { _dons ∷ [Annotated Don]
   , _elapsed ∷ !Int
@@ -168,6 +177,7 @@ data SongState = SS
                                 -- doing so
   , _flyingOff ∷ [Annotated Don]
   , _score ∷ Score
+  , _songCombo ∷ Combo
   }
 
 makeLenses ''SongState
