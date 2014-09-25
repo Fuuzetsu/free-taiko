@@ -194,10 +194,14 @@ renderElements ∷ UnixTime → SongLoop ()
 renderElements ct = do
   bkd ← use (screenState . blocking)
   imgs ← use (resources . images)
+  let center b = bitmapSize b & both %~ ((/ 2) . fromIntegral)
 
   -- Background
-  let (w, h) = bitmapSize (imgs ^. bg1080p) & both %~ ((/ 2) . fromIntegral)
+  let (w, h) = center (imgs ^. bg1080p)
   translate (V2 w h) (bitmap (imgs ^. bg1080p))
+
+  -- Belt
+  translate (uncurry V2 (center (imgs ^. belt))) (bitmap (imgs ^. belt))
 
   -- Score info &c
   renderInfo bkd
