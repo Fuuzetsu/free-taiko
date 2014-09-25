@@ -99,10 +99,11 @@ data Score = Score { _scorePerfect ∷ Int
                    , _scoreWrong ∷ Int
                    , _scoreMiss ∷ Int
                    , _scoreCalmDown ∷ Int
+                   , _scorePoints ∷ Int
                    } deriving (Show, Eq)
 
 instance Default Score where
-  def = Score 0 0 0 0 0 0
+  def = Score 0 0 0 0 0 0 0
 
 makeLenses ''Score
 
@@ -178,6 +179,7 @@ data SongState = SS
   , _flyingOff ∷ [Annotated Don]
   , _score ∷ Score
   , _songCombo ∷ Combo
+  , _taikoData ∷ TaikoData
   }
 
 makeLenses ''SongState

@@ -57,6 +57,7 @@ toSS (_, d) = do
               , _blocking = []
               , _flyingOff = []
               , _songCombo = def
+              , _taikoData = d
               }
 
   where
@@ -67,6 +68,10 @@ toSS (_, d) = do
       8  → SmallBlue
       12 → BigBlue
       _  → SmallRed
+
+-- | Calculate the base hit value for the song
+baseHit ∷ SongState → Int
+baseHit _ = 80
 
 diffToMs ∷ UnixDiffTime → Double
 diffToMs (UnixDiffTime (CTime s) ms) =
@@ -94,7 +99,7 @@ check ct (Annot t d) d' =
       | otherwise → NOP
 
 calcAccuracy ∷ Score → Double
-calcAccuracy (Score p g b w m _) =
+calcAccuracy (Score p g b w m _ _) =
   let n = fromIntegral $ p + g + b + w + m
   in if n == 0
      then n
@@ -128,11 +133,13 @@ renderInfo bkd = do
   fps ← getFPS
   cmb ← use (screenState . songCombo)
   acc ← calcAccuracy <$> use (screenState . score)
+  pts ← use (screenState . score . scorePoints)
   color red $ translate (V2 10 10) $ text fnt 10 (show fps)
   color yellow . translate (V2 30 30) . text fnt 10 $ show scr
   color yellow . translate (V2 30 45) . text fnt 10 $ show (map fst bkd)
   color green  . translate (V2 30 60) . text fnt 10 $ show cmb
   color green  . translate (V2 30 75) . text fnt 10 $ show acc ++ "%"
+  color green  . translate (V2 30 90) . text fnt 10 $ show pts
 
 prune ∷ UnixTime → SongLoop [Annotated Don]
 prune ct = do
@@ -211,6 +218,22 @@ sucCombo = do
 resetCombo ∷ SongLoop ()
 resetCombo = screenState . songCombo . currentCombo .= 0
 
+-- | Increases the score based on the hit scored
+incScore ∷ Hit → SongLoop ()
+incScore h = do
+  ss ← use screenState
+  c' ← use (screenState . songCombo . currentCombo)
+  let c ∷ Double
+      c = fromIntegral c' / 10
+      m = modifier h $ 300 + floor c * baseHit ss
+      ma = modifier h $ 300 + 10 * baseHit ss
+
+  screenState . score . scorePoints += min m ma
+  where
+    modifier Perfect x = x
+    modifier Good x = x `div` 2
+    modifier _ _ = 0
+
 renderElements ∷ UnixTime → SongLoop ()
 renderElements ct = do
   bkd ← use (screenState . blocking)
@@ -252,10 +275,10 @@ innerLoop = do
   when (length remaining > 0) $ use (screenState . waitingFor) >>= \case
     Nothing → return ()
     Just d → case check ct (head remaining) d of
-      Perfect → addScore scorePerfect  >> fly ct >> sucCombo
-      Good    → addScore scoreGood     >> fly ct >> sucCombo
-      Bad     → addScore scoreBad      >> fly ct >> resetCombo
-      Wrong   → addScore scoreWrong              >> resetCombo
+      Perfect → addScore scorePerfect  >> fly ct >> incScore Perfect >> sucCombo
+      Good    → addScore scoreGood     >> fly ct >> incScore Good    >> sucCombo
+      Bad     → addScore scoreBad      >> resetCombo
+      Wrong   → addScore scoreWrong    >> resetCombo
       NOP     → addScore scoreCalmDown
       _       → return ()
 
