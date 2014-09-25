@@ -93,6 +93,13 @@ check ct (Annot t d) d' =
       | msc <= 150 → Bad
       | otherwise → NOP
 
+calcAccuracy ∷ Score → Double
+calcAccuracy (Score p g b w m _) =
+  let n = fromIntegral $ p + g + b + w + m
+  in if n == 0
+     then n
+     else (fromIntegral p / n + fromIntegral g * 0.5 / n) * 100
+
 processKeys ∷ SongLoop ()
 processKeys = do
   us ← use userSettings
@@ -120,10 +127,12 @@ renderInfo bkd = do
   fnt ← use (resources . font)
   fps ← getFPS
   cmb ← use (screenState . songCombo)
+  acc ← calcAccuracy <$> use (screenState . score)
   color red $ translate (V2 10 10) $ text fnt 10 (show fps)
   color yellow . translate (V2 30 30) . text fnt 10 $ show scr
   color yellow . translate (V2 30 45) . text fnt 10 $ show (map fst bkd)
   color green  . translate (V2 30 60) . text fnt 10 $ show cmb
+  color green  . translate (V2 30 75) . text fnt 10 $ show acc ++ "%"
 
 prune ∷ UnixTime → SongLoop [Annotated Don]
 prune ct = do
