@@ -55,6 +55,7 @@ toSS (_, d) = do
               , _waitingFor = Nothing
               , _score = def
               , _blocking = []
+              , _flyingOff = []
               }
 
   where
@@ -74,7 +75,8 @@ getBmp ∷ Images → Annotated Don → Bitmap
 getBmp i (Annot _ d) = i ^. case d of
   SmallBlue → smallBlue
   SmallRed → smallRed
-  _ → smallBlue
+  BigBlue → bigBlue
+  BigRed → bigRed
 
 check ∷ UnixTime → Annotated Don → Don → Hit
 check ct (Annot t d) d' =
@@ -133,8 +135,14 @@ addScore l = do
   screenState . score . l += 1
   screenState . waitingFor .= Nothing
 
-(↠) :: SongLoop a → ([Annotated Don] → [Annotated Don]) → SongLoop ()
-x ↠ f = x >> (screenState . dons %= f)
+-- | Drops one don and puts it into the list of dons that are ‘flying
+-- off’ from the goal towards the top of the screen.
+fly :: UnixTime → SongLoop ()
+fly ct = use (screenState . dons) >>= \case
+  [] → return ()
+  (Annot _ x) : xs → do
+    screenState . dons .= xs
+    screenState . flyingOff %= (Annot ct x:)
 
 -- | Produces the horizontal offset of the goal's render position.
 -- Effectively half the size of the goal bitmap for now.
@@ -151,6 +159,28 @@ renderAtGoal b = do
   widthOffset ← goalOffset
   translate (V2 widthOffset (y / 2)) (bitmap b)
 
+-- | Time for the don to spend in flying stage
+flyingTime ∷ Double
+flyingTime = 500
+
+pruneFlying ∷ UnixTime → SongLoop ()
+pruneFlying ct = do
+  let ft = negate $ round flyingTime
+  screenState . flyingOff %= dropWhile ((addMs ct ft >) . _annotTime)
+
+renderFlying ∷ UnixTime → Annotated Don → SongLoop ()
+renderFlying ct don@(Annot t _) = do
+  bmp ← flip getBmp don <$> use (resources . images)
+  let diff = diffToMs $ t `diffUnixTime` ct
+  if diff > flyingTime
+    then return ()
+    else do
+    Box _ (V2 _ y) ← getBoundingBox
+    let px = negate $ 200 / flyingTime * diff
+        py = (y / 2) / flyingTime * diff
+    translate (V2 px py) $ renderAtGoal bmp
+
+
 renderElements ∷ UnixTime → SongLoop ()
 renderElements ct = do
   bkd ← use (screenState . blocking)
@@ -164,27 +194,29 @@ renderElements ct = do
   -- Goal overlays
   mapM_ (renderAtGoal . snd) bkd
 
-  -- Upcoming dons
+  -- Upcoming dons, render at goal + offset by time
   ds ← use (screenState . dons)
-  Box _ (V2 _ y) ← getBoundingBox
-
-  -- Render at goal + offset by time
   let rend d = translate (V2 (renderPos ct d) 0) $ renderAtGoal (getBmp imgs d)
   mapM_ rend $ getDons ct 5000 ds
+
+  -- Dons that are flying off the screen
+  fl ← use (screenState . flyingOff)
+  mapM_ (renderFlying ct) fl
 
 innerLoop ∷ SongLoop ()
 innerLoop = do
   processKeys
   ct ← liftIO getUnixTime
   remaining ← prune ct
+  pruneFlying ct
 
   when (length remaining > 0) $ use (screenState . waitingFor) >>= \case
     Nothing → return ()
     Just d → case check ct (head remaining) d of
-      Perfect → addScore scorePerfect ↠ drop 1
-      Good    → addScore scoreGood    ↠ drop 1
-      Bad     → addScore scoreBad     ↠ drop 1
-      Wrong   → addScore scoreWrong   ↠ drop 1
+      Perfect → addScore scorePerfect  >> fly ct
+      Good    → addScore scoreGood     >> fly ct
+      Bad     → addScore scoreBad      >> fly ct
+      Wrong   → addScore scoreWrong
       NOP     → addScore scoreCalmDown
       _       → return ()
 

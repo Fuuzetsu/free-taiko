@@ -24,7 +24,6 @@ import qualified Data.List.PointedList as PL
 import qualified Data.Text as T
 import           Data.Typeable
 import           Data.UnixTime
-import           Foreign.C.Types
 import           FreeGame
 import           Game.Osu.OszLoader.Types
 
@@ -109,6 +108,8 @@ makeLenses ''Score
 
 data Images = Images { _smallRed ∷ Bitmap
                      , _smallBlue ∷ Bitmap
+                     , _bigRed ∷ Bitmap
+                     , _bigBlue ∷ Bitmap
                      , _goal ∷ Bitmap
                      , _innerRightPressed ∷ Bitmap
                      , _innerLeftPressed ∷ Bitmap
@@ -163,6 +164,7 @@ data SongState = SS
   , _blocking ∷ [(Key, Bitmap)] -- ^ List of keys we're waiting to go
                                 -- up and bitmaps to render while
                                 -- doing so
+  , _flyingOff ∷ [Annotated Don]
   , _score ∷ Score
   }
 

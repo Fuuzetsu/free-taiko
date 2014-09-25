@@ -45,17 +45,21 @@ loadImages ∷ MonadIO m ⇒ m Images
 loadImages = do
   sb ← readBitmap $ imgdir </> "small_blue.png"
   sr ← readBitmap $ imgdir </> "small_red.png"
+  bb ← readBitmap $ imgdir </> "big_blue.png"
+  br ← readBitmap $ imgdir </> "big_red.png"
   gl ← readBitmap $ imgdir </> "goal.png"
-  or ← readBitmap $ imgdir </> "outer_right_pressed.png"
+  oR ← readBitmap $ imgdir </> "outer_right_pressed.png"
   ol ← readBitmap $ imgdir </> "outer_left_pressed.png"
   ir ← readBitmap $ imgdir </> "inner_right_pressed.png"
   il ← readBitmap $ imgdir </> "inner_left_pressed.png"
   return $ Images { _smallBlue = sb
                   , _smallRed = sr
+                  , _bigBlue = bb
+                  , _bigRed = br
                   , _goal = gl
                   , _innerRightPressed = ir
                   , _innerLeftPressed = il
-                  , _outerRightPressed = or
+                  , _outerRightPressed = oR
                   , _outerLeftPressed = ol
                   }
 
