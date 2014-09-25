@@ -110,6 +110,10 @@ makeLenses ''Score
 data Images = Images { _smallRed ∷ Bitmap
                      , _smallBlue ∷ Bitmap
                      , _goal ∷ Bitmap
+                     , _innerRightPressed ∷ Bitmap
+                     , _innerLeftPressed ∷ Bitmap
+                     , _outerRightPressed ∷ Bitmap
+                     , _outerLeftPressed ∷ Bitmap
                      }
 
 makeLenses ''Images
@@ -156,9 +160,11 @@ data SongState = SS
   , _elapsed ∷ !Int
   , _lastTick ∷ !UnixTime
   , _waitingFor ∷ Maybe Don
-  , _blocking ∷ [Key] -- ^ List of keys we're waiting to go up
+  , _blocking ∷ [(Key, Bitmap)] -- ^ List of keys we're waiting to go
+                                -- up and bitmaps to render while
+                                -- doing so
   , _score ∷ Score
-  } deriving (Show, Eq)
+  }
 
 makeLenses ''SongState
 

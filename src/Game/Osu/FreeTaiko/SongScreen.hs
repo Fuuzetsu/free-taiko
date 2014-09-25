@@ -29,9 +29,9 @@ import Data.Int
 import Game.Osu.OszLoader.Types
 
 -- | Cuts off all the dons that should have played in the past.
--- Assumes proper don ordering.
-pruneDons ∷ UnixTime → [Annotated Don] → [Annotated Don]
-pruneDons t = dropWhile ((t >) . _annotTime)
+-- Assumes proper don ordering. Returns the missed and remaining dons.
+pruneDons ∷ UnixTime → [Annotated Don] → ([Annotated Don], [Annotated Don])
+pruneDons t = break ((t <) . _annotTime)
 
 -- | Takes all the dons that fall within some specified length of time
 -- in the future, given in milliseconds.
@@ -93,29 +93,32 @@ songLoop = do
   q ← use quit
   Box _ (V2 x y) ← getBoundingBox
   us ← use userSettings
+  imgs ← use (resources . images)
 
   let onKey k = whenM (keyPress (us ^. k))
-      k -!> d = do
+      k -!> (d, b) = do
         let k' = us ^. k
             bkd = screenState . blocking
-        whenM (keyUp k') $ bkd %= filter (/= k')
+        whenM (keyUp k') $ bkd %= filter ((/= k') . fst)
         whenM (keyDown k') $ do
-          blockedKeys ← use (screenState . blocking)
+          blockedKeys ← map fst <$> use (screenState . blocking)
           when (k' `notElem` blockedKeys) $ do
-            bkd %= (k':)
+            bkd %= ((k', imgs ^. b):)
             screenState . waitingFor .= Just d
 
   onKey quitKey $ quit .= True
-  outsideLeft -!> BigBlue
-  outsideRight -!> BigBlue
-  insideLeft -!> SmallRed
-  insideRight -!> SmallRed
+  outsideLeft -!> (BigBlue, outerLeftPressed)
+  outsideRight -!> (BigBlue, outerRightPressed)
+  insideLeft -!> (SmallRed, innerLeftPressed)
+  insideRight -!> (SmallRed, innerRightPressed)
 
-  let pruned = pruneDons ct ds
+  let (missed, pruned) = pruneDons ct ds
       next = getDons ct (round x) pruned
 
+  screenState . score . scoreMiss += length missed
+
   when (length pruned > 0) $ use (screenState . waitingFor) >>= \case
-    Nothing → return ()
+    Nothing → screenState . dons .= pruned
     Just d → case check ct (head pruned) d of
       Perfect → ssuc scorePerfect pruned
       Good → ssuc scoreGood pruned
@@ -125,21 +128,22 @@ songLoop = do
       NOP → ssucp scoreCalmDown pruned
 
   fps ← getFPS
-  imgs ← use (resources . images)
 
-  let middle = (y / 2)
   color (Color 255 0 0 255) $ translate (V2 10 10) $ text fnt 10 (show fps)
   -- color green . translate (V2 (x - 25) 20) . text fnt 20 . show $ length next
   scr ← use (screenState . score)
   bkd ← use (screenState . blocking)
   color yellow . translate (V2 30 30) . text fnt 10 $ show scr
-  color yellow . translate (V2 30 45) . text fnt 10 $ show bkd
-  let goalImg = imgs ^. goal
+  color yellow . translate (V2 30 45) . text fnt 10 $ show (map fst bkd)
+  let middle = (y / 2)
+      goalImg = imgs ^. goal
       hg = (/ 2) . fromIntegral . fst . bitmapSize $ imgs ^. goal
       rd d = translate (V2 (renderPos ct d x + hg) (y / 2))
                $ bitmap (getBmp imgs d)
+      renderAtGoal b = translate (V2 hg middle) $ bitmap b
 
-  translate (V2 hg middle) $ bitmap (imgs ^. goal)
+  renderAtGoal (imgs ^. goal)
+  mapM_ (renderAtGoal . snd) bkd
   mapM_ rd next
 
   tick >> unless q songLoop
