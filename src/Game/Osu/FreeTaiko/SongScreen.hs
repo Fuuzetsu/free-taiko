@@ -162,7 +162,7 @@ renderAtGoal ∷ Bitmap → SongLoop ()
 renderAtGoal b = do
   Box _ (V2 _ y) ← getBoundingBox
   widthOffset ← goalOffset
-  translate (V2 widthOffset (y / 2)) (bitmap b)
+  translate (V2 widthOffset (y / 2)) $ (bitmap b)
 
 -- | Time for the don to spend in flying stage
 flyingTime ∷ Double
@@ -170,20 +170,21 @@ flyingTime = 500
 
 pruneFlying ∷ UnixTime → SongLoop ()
 pruneFlying ct = do
-  let ft = negate $ round flyingTime
-  screenState . flyingOff %= dropWhile ((addMs ct ft >) . _annotTime)
+  let ft = round flyingTime
+  screenState . flyingOff %= filter ((ct <) . flip addMs ft . _annotTime)
 
 renderFlying ∷ UnixTime → Annotated Don → SongLoop ()
 renderFlying ct don@(Annot t _) = do
   bmp ← flip getBmp don <$> use (resources . images)
-  let diff = diffToMs $ t `diffUnixTime` ct
+  let diff = diffToMs $ ct `diffUnixTime` t
   if diff > flyingTime
     then return ()
     else do
     Box _ (V2 _ y) ← getBoundingBox
-    let px = negate $ 200 / flyingTime * diff
-        py = (y / 2) / flyingTime * diff
-    translate (V2 px py) $ renderAtGoal bmp
+    let px = 200 / flyingTime * diff
+        py = negate $ (y / 2) / flyingTime * diff
+        a  = realToFrac $ 1 - (diff / flyingTime)
+    color (Color 1 1 1 a) . translate (V2 px py) $ renderAtGoal bmp
 
 
 renderElements ∷ UnixTime → SongLoop ()
