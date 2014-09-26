@@ -89,14 +89,19 @@ getBmp i (Annot _ d) = i ^. case d of
   BigBlue → bigBlue
   BigRed → bigRed
 
-check ∷ UnixTime → Annotated Don → Don → Hit
-check ct (Annot t d) d' =
+check ∷ UnixTime → Annotated Don → Don → Difficulty → Hit
+check ct (Annot t d) d' (Difficulty { _overallDifficulty = od }) =
   let msc = diffToMs (t `diffUnixTime` ct) in case () of
-    _ | msc <= 150 && d /= d' → Wrong
-      | msc <= 50 && d == d' → Perfect
-      | msc <= 100 → Good
-      | msc <= 150 → Bad
+    _ | msc <= lu50 && d /= d' → Wrong
+      | msc <= lu300 && d == d' → Perfect
+      | msc <= lu100 → Good
+      | msc <= lu50 → Bad
       | otherwise → NOP
+  where
+    -- Values for no mods, http://w.ppy.sh/4/46/ODChart.png
+    lu300 = fromIntegral $ 78 - 6 * od
+    lu100 = fromIntegral $ 138 - 8 * od
+    lu50  = fromIntegral $ 198 - 10 * od
 
 calcAccuracy ∷ Score → Double
 calcAccuracy (Score p g b w m _ _) =
@@ -279,9 +284,10 @@ innerLoop = do
   remaining ← prune ct
   pruneFlying ct
 
+  dif ← use (screenState . taikoData . tdDifficulty)
   when (length remaining > 0) $ use (screenState . waitingFor) >>= \case
     Nothing → return ()
-    Just d → case check ct (head remaining) d of
+    Just d → case check ct (head remaining) d dif of
       Perfect → addScore scorePerfect  >> fly ct >> incScore Perfect >> sucCombo
       Good    → addScore scoreGood     >> fly ct >> incScore Good    >> sucCombo
       Bad     → addScore scoreBad      >> resetCombo
