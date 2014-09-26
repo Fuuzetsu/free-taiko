@@ -179,9 +179,9 @@ goalOffset = do
 -- Useful for goal overlays and the goal itself.
 renderAtGoal ∷ Bitmap → SongLoop ()
 renderAtGoal b = do
-  Box _ (V2 _ y) ← getBoundingBox
+  gh ← goalHeight
   widthOffset ← goalOffset
-  translate (V2 widthOffset (y * beltOffset)) $ (bitmap b)
+  translate (V2 widthOffset gh) $ (bitmap b)
 
 -- | Time for the don to spend in flying stage
 flyingTime ∷ Double
@@ -202,9 +202,9 @@ renderFlying ct don@(Annot t _) = do
   if diff > flyingTime
     then return ()
     else do
-    Box _ (V2 _ y) ← getBoundingBox
+    gh ← goalHeight
     let px = 200 / flyingTime * diff
-        py = negate $ (y * beltOffset) / flyingTime * diff
+        py = negate $ gh / flyingTime * diff
         a  = 1 - (diff / flyingTime)
     color (Color 1 1 1 (realToFrac a))
       . translate (V2 px py) . scale (V2 a a) $ renderAtGoal bmp
@@ -234,6 +234,11 @@ incScore h = do
     modifier Good x = x `div` 2
     modifier _ _ = 0
 
+goalHeight ∷ SongLoop Double
+goalHeight = do
+  Box _ (V2 _ sy) ← getBoundingBox
+  return $ sy * beltOffset
+
 renderElements ∷ UnixTime → SongLoop ()
 renderElements ct = do
   bkd ← use (screenState . blocking)
@@ -245,7 +250,9 @@ renderElements ct = do
   translate (V2 w h) (bitmap (imgs ^. bg1080p))
 
   -- Belt
-  translate (uncurry V2 (center (imgs ^. belt))) (bitmap (imgs ^. belt))
+  let (bw, b) = (fst $ center b, imgs ^. belt)
+  gh ← goalHeight
+  translate (V2 bw gh) (bitmap b)
 
   -- Score info &c
   renderInfo bkd
