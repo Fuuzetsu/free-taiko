@@ -131,6 +131,7 @@ data Images = Images { _smallRed ∷ Bitmap
                      , _hitGoodL ∷ Bitmap
                      , _hitGoodS ∷ Bitmap
                      , _hitMiss ∷ Bitmap
+                     , _numbers ∷ [Bitmap]
                      }
 
 makeLenses ''Images

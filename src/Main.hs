@@ -60,6 +60,8 @@ loadImages = do
   hgl' ← readBitmap $ imgdir </> "hit_goodL.png"
   hgs' ← readBitmap $ imgdir </> "hit_goodS.png"
   hm ← readBitmap $ imgdir </> "hit_miss.png"
+  let mkNum x = readBitmap $ imgdir </> "default-" ++ show x ++ ".png"
+  nums ← mapM mkNum [0 .. 9 ∷ Integer]
   return $ Images { _smallBlue = sb
                   , _smallRed = sr
                   , _bigBlue = bb
@@ -77,6 +79,7 @@ loadImages = do
                   , _hitGoodL = hgl'
                   , _hitGoodS = hgs'
                   , _hitMiss = hm
+                  , _numbers = nums
                   }
 
 loadRes ∷ MonadIO m ⇒ m Resources

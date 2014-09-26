@@ -22,6 +22,7 @@ module Game.Osu.FreeTaiko.SongScreen where
 import Control.Monad.State.Strict
 import Control.Lens
 import Data.Default
+import Data.List (unfoldr)
 import Data.UnixTime
 import Foreign.C.Types
 import Game.Osu.FreeTaiko.Types
@@ -140,24 +141,21 @@ processKeys = do
 
   onKey quitKey $ quit .= True
   outsideLeft -!> (SmallBlue, outerLeftPressed)
-  outsideRight -!> (BigBlue, outerRightPressed)
+  outsideRight -!> (SmallBlue, outerRightPressed)
   insideLeft -!> (SmallRed, innerLeftPressed)
   insideRight -!> (SmallRed, innerRightPressed)
 
-renderInfo ∷ [(Key, Bitmap)] → SongLoop ()
-renderInfo bkd = do
+renderInfo ∷ SongLoop ()
+renderInfo = do
   scr ← use (screenState . score)
   fnt ← use (resources . font)
   fps ← getFPS
   cmb ← use (screenState . songCombo)
   acc ← calcAccuracy <$> use (screenState . score)
-  pts ← use (screenState . score . scorePoints)
   color red $ translate (V2 10 10) $ text fnt 10 (show fps)
   color yellow . translate (V2 30 30) . text fnt 10 $ show scr
-  color yellow . translate (V2 30 45) . text fnt 10 $ show (map fst bkd)
   color green  . translate (V2 30 60) . text fnt 10 $ show cmb
   color green  . translate (V2 30 75) . text fnt 10 $ show acc ++ "%"
-  color green  . translate (V2 30 90) . text fnt 10 $ show pts
 
 prune ∷ UnixTime → SongLoop [Annotated Don]
 prune ct = do
@@ -280,6 +278,28 @@ goalHeight = do
   Box _ (V2 _ sy) ← getBoundingBox
   return $ sy * beltOffset
 
+stitchScore ∷ Images → Int → SongLoop [(Bitmap, Double, Double)]
+stitchScore imgs i = do
+  Box _ (V2 sx _) ← getBoundingBox
+  let fl b = let (x, y) = bitmapSize b in (b, fromIntegral x, y)
+      -- get size of each digit
+      ns = map (fl . getN) ds
+      -- get maximum width of a digit for even spacing
+      maxw = foldr (\(_, x, _) x' → max x x') 0 ns
+      -- translate each digit into screen co-ordinates
+      fixCoord (b, _, y) i' = (b, sx - (maxw * i'), fromIntegral y / 2 + 10)
+
+  return $ zipWith fixCoord ns [1 ..]
+  where
+    getN n = (imgs ^. numbers) !! n
+    -- pad out to 8 digits
+    ds = digs ++ replicate (8 - length digs) 0
+
+    -- gets a list of digits in reverse
+    digs = unfoldr (\b -> if b == 0
+                          then Nothing
+                          else Just (b `mod` 10, b `div` 10)) $ i
+
 renderElements ∷ UnixTime → SongLoop ()
 renderElements ct = do
   bkd ← use (screenState . blocking)
@@ -301,8 +321,12 @@ renderElements ct = do
   gh ← goalHeight
   translate (V2 bw gh) (bitmap b)
 
+  -- Score
+  sc ← use (screenState . score . scorePoints) >>= stitchScore imgs
+  mapM_ (\(b', x, y) → translate (V2 x y) (bitmap b')) sc
+
   -- Score info &c
-  renderInfo bkd
+  renderInfo
 
   -- Goal shape
   renderAtGoal (imgs ^. goal)
