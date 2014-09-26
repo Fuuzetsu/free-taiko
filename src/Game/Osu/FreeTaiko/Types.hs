@@ -118,6 +118,7 @@ data Images = Images { _smallRed ∷ Bitmap
                      , _outerLeftPressed ∷ Bitmap
                      , _bg1080p ∷ Bitmap
                      , _belt ∷ Bitmap
+                     , _drum ∷ Bitmap
                      }
 
 makeLenses ''Images

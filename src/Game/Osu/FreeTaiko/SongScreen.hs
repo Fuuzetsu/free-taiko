@@ -173,20 +173,39 @@ fly ct = use (screenState . dons) >>= \case
     screenState . dons .= xs
     screenState . flyingOff %= (Annot ct x:)
 
+-- As 'goalOffset' but for drum
+drumOffset ∷ SongLoop Double
+drumOffset = do
+  d ← use (resources . images . drum)
+  let (dw, _) = bitmapSize d
+  return $ fromIntegral dw / 2
+
 -- | Produces the horizontal offset of the goal's render position.
 -- Effectively half the size of the goal bitmap for now.
 goalOffset ∷ SongLoop Double
 goalOffset = do
  g ← use (resources . images . goal)
- return . (/ 2) . fromIntegral . fst $ bitmapSize g
+ b ← use (resources . images . belt)
+ let (bw, _) = bitmapSize b
+     (gw, _) = bitmapSize g
+     -- render goal this much into the belt
+     r = 0.1479 -- 0.2
+
+ return $ fromIntegral bw * r + fromIntegral gw / 2
+
+renderOver :: SongLoop Double -> Bitmap -> SongLoop ()
+renderOver l b = do
+  gh ← goalHeight
+  wo ← l
+  translate (V2 wo gh) (bitmap b)
 
 -- | Renders the given bitmap at the same place as the goal itself.
 -- Useful for goal overlays and the goal itself.
 renderAtGoal ∷ Bitmap → SongLoop ()
-renderAtGoal b = do
-  gh ← goalHeight
-  widthOffset ← goalOffset
-  translate (V2 widthOffset gh) $ (bitmap b)
+renderAtGoal = renderOver goalOffset
+
+renderAtDrum ∷ Bitmap → SongLoop ()
+renderAtDrum = renderOver drumOffset
 
 -- | Time for the don to spend in flying stage
 flyingTime ∷ Double
@@ -254,6 +273,12 @@ renderElements ct = do
   let (w, h) = center (imgs ^. bg1080p)
   translate (V2 w h) (bitmap (imgs ^. bg1080p))
 
+  -- Drum, goes under the belt
+  renderAtDrum (imgs ^. drum)
+
+  -- Drum overlays
+  mapM_ (renderAtDrum . snd) bkd
+
   -- Belt
   let (bw, b) = (fst $ center b, imgs ^. belt)
   gh ← goalHeight
@@ -264,9 +289,6 @@ renderElements ct = do
 
   -- Goal shape
   renderAtGoal (imgs ^. goal)
-
-  -- Goal overlays
-  mapM_ (renderAtGoal . snd) bkd
 
   -- Upcoming dons, render at goal + offset by time
   ds ← use (screenState . dons)
