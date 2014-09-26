@@ -107,6 +107,13 @@ instance Default Score where
 
 makeLenses ''Score
 
+-- | Time-parametrised animation.
+data Animation m a = A { _endTime ∷ UnixTime
+                       , _animate ∷ UnixTime → m a
+                       }
+
+makeLenses ''Animation
+
 data Images = Images { _smallRed ∷ Bitmap
                      , _smallBlue ∷ Bitmap
                      , _bigRed ∷ Bitmap
@@ -119,6 +126,11 @@ data Images = Images { _smallRed ∷ Bitmap
                      , _bg1080p ∷ Bitmap
                      , _belt ∷ Bitmap
                      , _drum ∷ Bitmap
+                     , _hitGreatL ∷ Bitmap
+                     , _hitGreatS ∷ Bitmap
+                     , _hitGoodL ∷ Bitmap
+                     , _hitGoodS ∷ Bitmap
+                     , _hitMiss ∷ Bitmap
                      }
 
 makeLenses ''Images
@@ -181,8 +193,9 @@ data SongState = SS
   , _score ∷ Score
   , _songCombo ∷ Combo
   , _taikoData ∷ TaikoData
+  , _goalEffects ∷ [Animation SongLoop ()]
   }
 
-makeLenses ''SongState
-
 type SongLoop = StateT (ScreenState SongState) Game
+
+makeLenses ''SongState

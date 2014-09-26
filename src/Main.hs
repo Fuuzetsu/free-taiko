@@ -55,6 +55,11 @@ loadImages = do
   bg ← readBitmap $ imgdir </> "bg_1080p.png"
   bt ← readBitmap $ imgdir </> "belt.png"
   dr ← readBitmap $ imgdir </> "drum.png"
+  hgl ← readBitmap $ imgdir </> "hit_greatL.png"
+  hgs ← readBitmap $ imgdir </> "hit_greatS.png"
+  hgl' ← readBitmap $ imgdir </> "hit_goodL.png"
+  hgs' ← readBitmap $ imgdir </> "hit_goodS.png"
+  hm ← readBitmap $ imgdir </> "hit_miss.png"
   return $ Images { _smallBlue = sb
                   , _smallRed = sr
                   , _bigBlue = bb
@@ -67,6 +72,11 @@ loadImages = do
                   , _bg1080p = bg
                   , _belt = bt
                   , _drum = dr
+                  , _hitGreatL = hgl
+                  , _hitGreatS = hgs
+                  , _hitGoodL = hgl'
+                  , _hitGoodS = hgs'
+                  , _hitMiss = hm
                   }
 
 loadRes ∷ MonadIO m ⇒ m Resources

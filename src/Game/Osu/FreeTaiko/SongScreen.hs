@@ -54,10 +54,11 @@ toSS (_, d) = do
               , _lastTick = ct
               , _waitingFor = Nothing
               , _score = def
-              , _blocking = []
-              , _flyingOff = []
+              , _blocking = def
+              , _flyingOff = def
               , _songCombo = def
               , _taikoData = d
+              , _goalEffects = def
               }
 
   where
@@ -82,12 +83,24 @@ diffToMs (UnixDiffTime (CTime s) ms) =
 renderPos ∷ UnixTime → Annotated Don → Double
 renderPos t (Annot t' _) = diffToMs $ t' `diffUnixTime` t
 
-getBmp ∷ Images → Annotated Don → Bitmap
-getBmp i (Annot _ d) = i ^. case d of
+getBmp ∷ Images → Don → Bitmap
+getBmp i d = i ^. case d of
   SmallBlue → smallBlue
   SmallRed → smallRed
   BigBlue → bigBlue
   BigRed → bigRed
+
+getHitBmp ∷ Images → Don → Hit → Bitmap
+getHitBmp i d h = i ^. case (d, h) of
+  (SmallBlue, Perfect) → hitGreatS
+  (SmallRed, Perfect) → hitGreatS
+  (BigBlue, Perfect) → hitGreatL
+  (BigRed, Perfect) → hitGreatL
+  (SmallBlue, Good) → hitGoodS
+  (SmallRed, Good) → hitGoodS
+  (BigBlue, Good) → hitGoodL
+  (BigRed, Good) → hitGoodL
+  (_, _) → hitMiss
 
 check ∷ UnixTime → Annotated Don → Don → Difficulty → Hit
 check ct (Annot t d) d' (Difficulty { _overallDifficulty = od }) =
@@ -152,6 +165,7 @@ prune ct = do
   let (m, r) = pruneDons ct ds
   screenState . score . scoreMiss += length m
   screenState . dons .= r
+  unless (null m) (runMiss ct)
   return r
 
 songLoop ∷ SongLoop ()
@@ -219,8 +233,11 @@ pruneFlying ct = do
   let ft = round flyingTime
   screenState . flyingOff %= filter ((ct <) . flip addMs ft . _annotTime)
 
+pruneAnimations ∷ UnixTime → SongLoop ()
+pruneAnimations ct = screenState . goalEffects %= filter ((ct <) . _endTime)
+
 renderFlying ∷ UnixTime → Annotated Don → SongLoop ()
-renderFlying ct don@(Annot t _) = do
+renderFlying ct (Annot t don) = do
   bmp ← flip getBmp don <$> use (resources . images)
   let diff = diffToMs $ ct `diffUnixTime` t
   if diff > flyingTime
@@ -290,9 +307,15 @@ renderElements ct = do
   -- Goal shape
   renderAtGoal (imgs ^. goal)
 
+  -- Goal animations
+  efs ← use (screenState . goalEffects)
+  go ← goalOffset
+  mapM_ (translate (V2 go gh) . flip _animate ct) efs
+
   -- Upcoming dons, render at goal + offset by time
   ds ← use (screenState . dons)
-  let rend d = translate (V2 (renderPos ct d) 0) $ renderAtGoal (getBmp imgs d)
+  let rend d = translate (V2 (renderPos ct d) 0)
+               $ renderAtGoal (getBmp imgs $ _unAnnot d)
   mapM_ rend $ getDons ct 5000 ds
 
   -- Dons that are flying off the screen
@@ -305,15 +328,16 @@ innerLoop = do
   ct ← liftIO getUnixTime
   remaining ← prune ct
   pruneFlying ct
+  pruneAnimations ct
 
   dif ← use (screenState . taikoData . tdDifficulty)
   when (length remaining > 0) $ use (screenState . waitingFor) >>= \case
     Nothing → return ()
     Just d → case check ct (head remaining) d dif of
-      Perfect → addScore scorePerfect  >> fly ct >> incScore Perfect >> sucCombo
-      Good    → addScore scoreGood     >> fly ct >> incScore Good    >> sucCombo
-      Bad     → addScore scoreBad      >> resetCombo
-      Wrong   → addScore scoreWrong    >> resetCombo
+      Perfect → addScore scorePerfect  >> success ct Perfect d
+      Good    → addScore scoreGood     >> success ct Good d
+      Bad     → addScore scoreBad      >> resetCombo >> runMiss ct
+      Wrong   → addScore scoreWrong    >> resetCombo >> runMiss ct
       NOP     → addScore scoreCalmDown
       _       → return ()
 
@@ -321,3 +345,38 @@ innerLoop = do
 
   q ← use quit
   tick >> unless (q || null remaining) innerLoop
+  where
+    success ∷ UnixTime → Hit → Don → SongLoop ()
+    success t h d = do
+      imgs ← use (resources . images)
+      screenState . goalEffects %= (pulse t (getHitBmp imgs d h):)
+      fly t >> incScore h >> sucCombo
+
+runMiss ∷ UnixTime → SongLoop ()
+runMiss t = use (resources . images) >>= \i → pulseBmp t (i ^. hitMiss)
+
+pulseBmp ∷ UnixTime → Bitmap → SongLoop ()
+pulseBmp t b = screenState . goalEffects %= (pulse t b:)
+
+ -- Creates a ‘pulse’ animation over 200ms, used for hit effects.
+pulse ∷ UnixTime → Bitmap → Animation SongLoop ()
+pulse t b = let dur = 300
+            in A { _endTime = addMs t dur
+                 , _animate = \ct → case pulseF dur ct t of
+                   (o, sc) → color (Color 1 1 1 (realToFrac o))
+                             . scale (V2 sc sc)
+                             $ (bitmap b)
+                 }
+  where
+    -- Taking two times, returns the opacity and scaling needed for
+    -- the ‘pulse’ effect.
+    pulseF ∷ Int → UnixTime → UnixTime → (Double, Double)
+    pulseF dur c st =
+      let diff = diffToMs $ c `diffUnixTime` st
+          dh = fromIntegral $ dur `div` 3
+          minsc = 0.8
+      in case () of
+        _ | diff > fromIntegral dur → (0, 1)
+          | diff < dh  → let r = 1 / (dh / diff) in (r, max r minsc)
+          | diff >= dh → let r = 2 - (1 / (dh / diff)) in (r, max r minsc)
+          | otherwise  → (0, 1)
